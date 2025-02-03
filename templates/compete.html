@@ -6,7 +6,7 @@
 
 
 		<title>Medical Arena</title>
-
+		<link rel="stylesheet" type="text/css" href="../css/styles.css">
 
 
 	</head>
@@ -17,7 +17,127 @@
 
 
 		<h1>Compete</h1>
-		<p>This is Arena.</p>
+
+
+		<h2>Select Models</h2>
+
+		<span>Model 1:</span>
+		<select id="first_model_selected">
+			{% for model in llm_model_collection %}
+			<option value="{{model.db_id}}">{{model.name}}</option>
+			{% endfor %}
+		</select>
+
+		<script>
+			document.getElementById("first_model_selected").addEventListener("change", function(){
+				let firstSelected = this.value;
+				fetch(`/update_first_model/${firstSelected}`)
+					.then(response => response.text())
+			})
+
+
+		</script>
+
+
+		<br>
+
+		<span>Model 2:</span>
+		<select id="second_model_selected">
+			{% for model in llm_model_collection %}
+			<option value="{{model.db_id}}">{{model.name}}</option>
+			{% endfor %}
+		</select>
+
+		<script>
+			document.getElementById("second_model_selected").addEventListener("change", function(){
+				let secondSelected = this.value;
+				fetch(`/update_second_model/${secondSelected}`)
+					.then(response => response.text())
+			})
+
+
+		</script>
+
+
+
+		<h2>Answer from Model 1</h2>
+		<textarea readonly>This is model 1.</textarea>
+
+
+		<h2>Answer from Model 2</h2>
+		<textarea readonly>This is model 2.</textarea>
+
+
+
+		<h2>Your Response</h2>
+			
+		<div>
+			<form action="/submit_user_input" method="POST" id="user_input_box">
+				<span>Your Input:</span>
+				<br>
+				<textarea name="user_input" required></textarea>
+				<br>
+				<button type="submit">Submit</button>
+			</form>
+
+
+			<form action="/vote_first" method="POST">
+				<button type="submit" method="POST">Vote First</button>
+			</form>
+			
+
+			<form action="/vote_second" method="POST">
+				<button type="submit" method="POST">Vote Second</button>
+			</form>
+			
+
+			<form action="/vote_tie" method="POST">
+				<button type="submit" method="POST">Vote Tie</button>
+			</form>
+			
+
+			<form action="/restart" method="POST">
+				<button type="submit">Restart</button>
+			</form>
+			
+
+
+
+
+
+		</div>
+
+
+		
+
+
+
+
+
+		<!-- <form action="/add" method="POST">
+			<span>ID: </span>
+			<input type="text" name="db_id" required>
+			<br>
+			<span>Name:</span>
+			<input type="text" name="name" required>
+			<br>
+			<span>Company:</span>
+			<input type="text" name="company" required>
+			<br>
+			<span>Vote Score:</span>
+			<input type="number" name="vote_score" required>
+			<br>
+			<span>Test Score:</span>
+			<input type="number" name="test_score" required>
+			<br>
+			<span>Overall Score:</span>
+			<input type="number" name="overall_score" required>
+			<br>
+			<span>License:</span>
+			<input type="text" name="license" required>
+			<br>
+			<button type="submit">Add Model</button>
+		</form> -->
 
 
 

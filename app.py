@@ -11,6 +11,9 @@ app.config['SECRET_KEY'] = '123'
 
 db = SQLAlchemy(app)
 
+two_models_selected = []
+compete_initiated = False
+
 
 
 
@@ -29,7 +32,17 @@ def introduction():
 
 @app.route('/compete/')
 def compete():
-	return render_template("compete.html")
+	llm_model_collection = LLMDB.query.order_by(LLMDB.db_id).all()
+	selected_first = llm_model_collection[0] if llm_model_collection else None
+	selected_second = llm_model_collection[1] if llm_model_collection else None
+
+	assert selected_first and selected_second
+
+	two_models_selected.append(selected_first.db_id)
+	two_models_selected.append(selected_second.db_id)
+
+	# compete_initiated = True
+	return render_template("compete.html", llm_model_collection=llm_model_collection, two_models_selected=two_models_selected)
 
 @app.route('/add_model/')
 def add_model():
@@ -51,6 +64,64 @@ def add():
 
 	return redirect(url_for('home'))
 
+
+@app.route('/submit_user_input', methods=['GET', 'POST'])
+def submit_user_input():
+	new_user_input = request.form['user_input']
+
+	# TBD
+
+
+	return redirect(url_for('compete'))
+
+
+@app.route('/vote_first', methods=['POST'])
+def vote_first():
+	model = LLMDB.query.get(two_models_selected[0])
+	model.vote_score = model.vote_score + 2
+	db.session.commit()
+	return redirect(url_for('compete'))
+
+
+@app.route('/vote_second', methods=['POST'])
+def vote_second():
+	model = LLMDB.query.get(two_models_selected[1])
+	model.vote_score = model.vote_score + 2
+	db.session.commit()
+	return redirect(url_for('compete'))
+
+
+@app.route('/vote_tie', methods=['POST'])
+def vote_tie():
+	model_1 = LLMDB.query.get(two_models_selected[0])
+	model_2 = LLMDB.query.get(two_models_selected[1])
+	model_1.vote_score = model.vote_score + 1
+	model_2.vote_score = model.vote_score + 1
+	db.session.commit()
+	return redirect(url_for('compete'))
+
+@app.route('/restart')
+def restart():
+	compete_initiated = False
+
+	return compete()
+
+
+@app.route('/update_first_model/<int:db_id>')
+def update_first_model(db_id):
+	first_selected = LLMDB.query.get(db_id)
+	if first_selected:
+		two_models_selected[0] = first_selected.db_id
+		return str(first_selected.db_id)
+	return "Error: Model does not exist.", 404
+
+@app.route('/update_second_model/<int:db_id>')
+def update_second_model(db_id):
+	second_selected = LLMDB.query.get(db_id)
+	if second_selected:
+		two_models_selected[1] = second_selected.db_id
+		return str(second_selected.db_id)
+	return "Error: Model does not exist.", 404
 
 
 
