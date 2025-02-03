@@ -9,7 +9,10 @@
 
 
 
+
+
 	</head>
+
 
 
 	<body>
@@ -17,7 +20,42 @@
 
 
 		<h1>Leaderboard</h1>
-		<p>This is the leaderboard.</p>
+		<table>
+			<tr>
+				<th>Rank</th>
+				<th>ID</th>
+				<th>Name</th>
+				<th>Company</th>
+				<th>Vote Score</th>
+				<th>Test Score</th>
+				<th>Overall Score</th>
+				<th>License</th>
+			</tr>
+
+
+
+			{% for model in llm_model_collection %}
+
+			<tr>
+				<td>{{loop.index}}</td>
+				<td>{{model.db_id}}</td>
+				<td>{{model.name}}</td>
+				<td>{{model.company}}</td>
+				<td>{{model.vote_score}}</td>
+				<td>{{model.test_score}}</td>
+				<td>{{model.overall_score}}</td>
+				<td>{{model.license}}</td>
+			</tr>
+			
+			{% endfor %}
+
+
+
+
+
+
+
+		</table>
 
 
 
