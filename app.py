@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
+from openai import OpenAI
 # from wtforms import Textfield
 
 
@@ -13,6 +14,9 @@ db = SQLAlchemy(app)
 
 two_models_selected = []
 compete_initiated = False
+
+
+OpenAI_client = OpenAI()
 
 
 
