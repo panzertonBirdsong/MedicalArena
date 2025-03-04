@@ -8,6 +8,9 @@ from openai import OpenAI
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///llms.db'
+app.config['SQLALCHEMY_BINDS'] = {
+	'chats': 'sqlite:///chats_db.sqlite',
+}
 app.config['SECRET_KEY'] = '123'
 
 db = SQLAlchemy(app)
@@ -16,7 +19,7 @@ two_models_selected = []
 compete_initiated = False
 
 
-OpenAI_client = OpenAI()
+# OpenAI_client = OpenAI()
 
 
 
@@ -147,6 +150,16 @@ class LLMDB(db.Model):
 		self.test_score = test_score
 		self.overall_score = overall_score
 		self.license = license
+
+class ChatsDB(db.Model):
+	__bind_key__ = "chats"
+	__tablename__ = "chats_db"
+	chat_id = db.Column(db.Integer, primary_key=True)
+	model = db.Column(db.String(50))
+	chat_history = db.Column(db.JSON, default=[])
+
+	def __init__(self, chat_id, model):
+		self.chat_id = chat_id
 
 with app.app_context():
 	db.create_all()
