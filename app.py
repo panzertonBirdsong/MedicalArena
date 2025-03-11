@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
 from openai import OpenAI
@@ -72,15 +72,17 @@ def add():
 	return redirect(url_for('home'))
 
 
-@app.route('/submit_user_input', methods=['GET', 'POST'])
+@app.route('/submit_user_input', methods=['POST'])
 def submit_user_input():
-	new_user_input = request.form['user_input']
+	# new_user_input = request.form['user_input']
 
-	# TBD
+	answer_1 = "This is the answer from the first model"
+	answer_2 = "This is the answer from the second model"
 
 
-	return redirect(url_for('compete'))
+	# return redirect(url_for('compete'))
 
+	return jsonify({"answer_1": answer_1, "answer_2": answer_2})
 
 @app.route('/vote_first', methods=['POST'])
 def vote_first():
