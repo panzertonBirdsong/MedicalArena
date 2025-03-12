@@ -2,6 +2,11 @@ from flask import Flask, render_template, request, redirect, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
 from openai import OpenAI
+import random
+import os
+import openai
+import string
+import logging
 # from wtforms import Textfield
 
 
@@ -15,14 +20,16 @@ app.config['SECRET_KEY'] = '123'
 
 db = SQLAlchemy(app)
 
-two_models_selected = []
+# two_models_selected = []
 compete_initiated = False
 
 
-# OpenAI_client = OpenAI()
+# openai.api_key = os.getenv("OPENAI_API_KEY")
+OpenAI_client = OpenAI(
+    api_key=os.getenv("OPENAI_API_KEY"),
+)
 
-
-
+logging.basicConfig(level=logging.INFO)
 
 @app.route('/')
 def home():
@@ -39,17 +46,51 @@ def introduction():
 
 @app.route('/compete/')
 def compete():
+
+	# Generate Unique ID
+	new_id_0 = None
+	count = 0
+	while True:
+		new_id_0 = ''.join(random.choices(string.digits, k=6))
+		existed = ChatsDB.query.filter_by(chat_id=new_id_0).first()
+		if not existed:
+			break
+		if count > 99999:
+			return render_template("Faile to direct to compete")
+		count = count + 1
+
+
+
+	new_id_1 = None
+	count = 0
+	while True:
+		new_id_1 = ''.join(random.choices(string.digits, k=6))
+		existed = ChatsDB.query.filter_by(chat_id=new_id_1).first()
+		if not existed:
+			break
+		if count > 99999:
+			return render_template("Faile to direct to compete")
+		count = count + 1
+
+	selected_models = []
+
 	llm_model_collection = LLMDB.query.order_by(LLMDB.db_id).all()
 	selected_first = llm_model_collection[0] if llm_model_collection else None
 	selected_second = llm_model_collection[1] if llm_model_collection else None
 
 	assert selected_first and selected_second
 
-	two_models_selected.append(selected_first.db_id)
-	two_models_selected.append(selected_second.db_id)
+	selected_models.append(selected_first.db_id)
+	selected_models.append(selected_second.db_id)
+
+	new_chat_0 = ChatsDB(new_id_0, selected_first.name)
+	db.session.add(new_chat_0)
+	db.session.commit()
+	logging.info(f"ID list is {(new_chat_0.chat_id)}")
+	# new_chat_1 = ChatsDB(new_id_1, selected_second.name)
 
 	# compete_initiated = True
-	return render_template("compete.html", llm_model_collection=llm_model_collection, two_models_selected=two_models_selected)
+	return render_template("compete.html", llm_model_collection=llm_model_collection, chat_id=[new_id_0, new_id_1])
 
 @app.route('/add_model/')
 def add_model():
@@ -74,15 +115,43 @@ def add():
 
 @app.route('/submit_user_input', methods=['POST'])
 def submit_user_input():
-	# new_user_input = request.form['user_input']
 
-	answer_1 = "This is the answer from the first model"
-	answer_2 = "This is the answer from the second model"
+	answer_2 = "Models other than GPT-4o is yet to be implemented."
+
+	data = request.get_json()
+	chat_id = data.get("chat_id")
+	# selected_models = data.get("selected_models")
+	input_text = data.get("input_text")
 
 
-	# return redirect(url_for('compete'))
 
-	return jsonify({"answer_1": answer_1, "answer_2": answer_2})
+	# get response from the first model
+	# this works for chatgpt-4o, needs to be modified for other models
+	chat_0 = ChatsDB.query.filter_by(chat_id=int(chat_id[0])).first()
+
+	
+	chat_0.add_user_input(input_text)
+	db.session.commit()
+
+	logging.info(chat_0.chat_history)
+	history_0 = chat_0.chat_history
+	response_0 = OpenAI_client.chat.completions.create(
+		model="gpt-4o",
+		messages=history_0
+	)
+
+	reply_0 = response_0.choices[0].message.content
+
+	chat_0.add_agent_reply(reply_0)
+	db.session.commit()
+
+
+
+	# get response from the second model
+	# tbd
+
+
+	return jsonify({"answer_1": reply_0, "answer_2": answer_2})
 
 @app.route('/vote_first', methods=['POST'])
 def vote_first():
@@ -162,6 +231,16 @@ class ChatsDB(db.Model):
 
 	def __init__(self, chat_id, model):
 		self.chat_id = chat_id
+		self.model = model
+
+	def __repr__(self):
+		return f"<ChatsDB chat_id={self.chat_id}>"
+
+	def add_user_input(self, input_text):
+		self.chat_history = self.chat_history + [{"role": "user", "content": input_text}]
+
+	def add_agent_reply(self, reply):
+		self.chat_history = self.chat_history + [{"role": "assistant", "content": reply}]
 
 with app.app_context():
 	db.create_all()

@@ -104,7 +104,9 @@
 
 
 	<script>
-		// const input_form = document.getElementById("user_input_box")
+
+		const chat_id = {{ chat_id | tojson }};
+		console.log(chat_id)
 		document.getElementById("submit_input").addEventListener('click', function(){
 			// event.preventDefault();
 
@@ -113,7 +115,7 @@
 			fetch('/submit_user_input', {
 				method: "POST",
 				headers: {"Content-Type": "application/json"},
-				body: JSON.stringify({input_text: input_text})
+				body: JSON.stringify({chat_id: chat_id, input_text: input_text})
 			})
 			.then(response => response.json())
 			.then(data => {
