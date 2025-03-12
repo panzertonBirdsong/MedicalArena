@@ -29,9 +29,11 @@
 		</select>
 
 		<script>
+			const chat_id_list_first = {{ chat_id | tojson }};
+			const chat_id_first = chat_id_list_first[0]
 			document.getElementById("first_model_selected").addEventListener("change", function(){
-				let firstSelected = this.value;
-				fetch(`/update_first_model/${firstSelected}`)
+				let selected_db_id = this.value;
+				fetch(`/update_model_selection/${selected_db_id}/${chat_id_first}`)
 					.then(response => response.text())
 			})
 
@@ -49,9 +51,11 @@
 		</select>
 
 		<script>
+			const chat_id_list_second = {{ chat_id | tojson }};
+			const chat_id_second = chat_id_list_second[0]
 			document.getElementById("second_model_selected").addEventListener("change", function(){
-				let secondSelected = this.value;
-				fetch(`/update_second_model/${secondSelected}`)
+				let selected_db_id = this.value;
+				fetch(`/update_model_selection/${selected_db_id}/${chat_id_second}`)
 					.then(response => response.text())
 			})
 

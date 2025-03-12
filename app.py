@@ -56,7 +56,7 @@ def compete():
 		if not existed:
 			break
 		if count > 99999:
-			return render_template("Faile to direct to compete")
+			return render_template("Failed to direct to compete")
 		count = count + 1
 
 
@@ -69,14 +69,14 @@ def compete():
 		if not existed:
 			break
 		if count > 99999:
-			return render_template("Faile to direct to compete")
+			return render_template("Failed to direct to compete")
 		count = count + 1
 
 	selected_models = []
 
 	llm_model_collection = LLMDB.query.order_by(LLMDB.db_id).all()
 	selected_first = llm_model_collection[0] if llm_model_collection else None
-	selected_second = llm_model_collection[1] if llm_model_collection else None
+	selected_second = llm_model_collection[0] if llm_model_collection else None
 
 	assert selected_first and selected_second
 
@@ -84,12 +84,11 @@ def compete():
 	selected_models.append(selected_second.db_id)
 
 	new_chat_0 = ChatsDB(new_id_0, selected_first.name)
+	new_chat_1 = ChatsDB(new_id_1, selected_second.name)
 	db.session.add(new_chat_0)
+	db.session.add(new_chat_1)
 	db.session.commit()
-	logging.info(f"ID list is {(new_chat_0.chat_id)}")
-	# new_chat_1 = ChatsDB(new_id_1, selected_second.name)
 
-	# compete_initiated = True
 	return render_template("compete.html", llm_model_collection=llm_model_collection, chat_id=[new_id_0, new_id_1])
 
 @app.route('/add_model/')
@@ -98,7 +97,23 @@ def add_model():
 
 @app.route('/add', methods=['POST'])
 def add():
-	db_id = request.form['db_id']
+
+
+
+	new_id_0 = None
+	count = 0
+	while True:
+		new_id_0 = ''.join(random.choices(string.digits, k=6))
+		existed = LLMDB.query.filter_by(db_id=new_id_0).first()
+		if not existed:
+			break
+		if count > 99999:
+			return render_template("Failed to direct to generate a new id.")
+		count = count + 1
+
+
+	# db_id = request.form['db_id']
+	db_id = new_id_0
 	name = request.form['name']
 	company = request.form['company']
 	vote_score = request.form['vote_score']
@@ -116,31 +131,20 @@ def add():
 @app.route('/submit_user_input', methods=['POST'])
 def submit_user_input():
 
-	answer_2 = "Models other than GPT-4o is yet to be implemented."
-
+	# get info from html
 	data = request.get_json()
 	chat_id = data.get("chat_id")
-	# selected_models = data.get("selected_models")
 	input_text = data.get("input_text")
 
 
 
 	# get response from the first model
-	# this works for chatgpt-4o, needs to be modified for other models
 	chat_0 = ChatsDB.query.filter_by(chat_id=int(chat_id[0])).first()
 
-	
 	chat_0.add_user_input(input_text)
 	db.session.commit()
 
-	logging.info(chat_0.chat_history)
-	history_0 = chat_0.chat_history
-	response_0 = OpenAI_client.chat.completions.create(
-		model="gpt-4o",
-		messages=history_0
-	)
-
-	reply_0 = response_0.choices[0].message.content
+	reply_0 = get_reply_from_agent(chat_0.model, chat_0.chat_history, chat_0.developer_instruction)
 
 	chat_0.add_agent_reply(reply_0)
 	db.session.commit()
@@ -148,10 +152,49 @@ def submit_user_input():
 
 
 	# get response from the second model
-	# tbd
+	chat_1 = ChatsDB.query.filter_by(chat_id=int(chat_id[1])).first()
+
+	chat_1.add_user_input(input_text)
+	db.session.commit()
+
+	reply_1 = get_reply_from_agent(chat_1.model, chat_1.chat_history, chat_1.developer_instruction)
+
+	chat_1.add_agent_reply(reply_1)
+	db.session.commit()
 
 
-	return jsonify({"answer_1": reply_0, "answer_2": answer_2})
+
+	return jsonify({"answer_1": reply_0, "answer_2": reply_1})
+
+def get_reply_from_agent(model_name, chat_history, developer_instruction):
+	
+	if model_name == "gpt-4o":
+
+		modified_history = []
+
+		for msg in chat_history:
+			modified_msg = msg.copy()
+			if modified_msg["role"] == "agent":
+				modified_msg["role"] = "assistant"
+
+			modified_history.append(modified_msg)
+
+		modified_history = [{"role": "developer", "content": developer_instruction}] + modified_history
+
+		logging.info(modified_history)
+
+		response = OpenAI_client.chat.completions.create(
+			model=model_name,
+			messages=modified_history
+		)
+		reply = response.choices[0].message.content
+		return reply
+	elif model_name == "gemini-2.0-flash":
+		...
+	else:
+		logging.info(f"Error: {model_name} not found.")
+		return f"Error: {model_name} not found."
+
 
 @app.route('/vote_first', methods=['POST'])
 def vote_first():
@@ -185,21 +228,23 @@ def restart():
 	return compete()
 
 
-@app.route('/update_first_model/<int:db_id>')
-def update_first_model(db_id):
-	first_selected = LLMDB.query.get(db_id)
-	if first_selected:
-		two_models_selected[0] = first_selected.db_id
-		return str(first_selected.db_id)
+@app.route('/update_first_model/<int:db_id>/<int:chat_id>')
+def update_first_model(db_id, chat_id):
+	selected_model = LLMDB.query.get(db_id)
+	chat = ChatsDB.query.get(chat_id)
+	if selected_model and chat:
+		if len(chat.chat_history) == 0:
+			chat.model = selected_model.name
+		return str(chat.model)
 	return "Error: Model does not exist.", 404
 
-@app.route('/update_second_model/<int:db_id>')
-def update_second_model(db_id):
-	second_selected = LLMDB.query.get(db_id)
-	if second_selected:
-		two_models_selected[1] = second_selected.db_id
-		return str(second_selected.db_id)
-	return "Error: Model does not exist.", 404
+# @app.route('/update_second_model/<int:db_id>')
+# def update_second_model(db_id):
+# 	second_selected = LLMDB.query.get(db_id)
+# 	if second_selected:
+# 		two_models_selected[1] = second_selected.db_id
+# 		return str(second_selected.db_id)
+# 	return "Error: Model does not exist.", 404
 
 
 
@@ -228,10 +273,12 @@ class ChatsDB(db.Model):
 	chat_id = db.Column(db.Integer, primary_key=True)
 	model = db.Column(db.String(50))
 	chat_history = db.Column(db.JSON, default=[])
+	developer_instruction = db.Column(db.String(50))
 
 	def __init__(self, chat_id, model):
 		self.chat_id = chat_id
 		self.model = model
+		self.developer_instruction = "Please provide assistance as a BioMedical expert."
 
 	def __repr__(self):
 		return f"<ChatsDB chat_id={self.chat_id}>"
@@ -240,7 +287,7 @@ class ChatsDB(db.Model):
 		self.chat_history = self.chat_history + [{"role": "user", "content": input_text}]
 
 	def add_agent_reply(self, reply):
-		self.chat_history = self.chat_history + [{"role": "assistant", "content": reply}]
+		self.chat_history = self.chat_history + [{"role": "agent", "content": reply}]
 
 with app.app_context():
 	db.create_all()
