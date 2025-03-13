@@ -7,7 +7,12 @@ import os
 import openai
 import string
 import logging
+import time
+from google import genai
 # from wtforms import Textfield
+
+# delete any chat from database or dictionary if no update for 1 hour
+chat_max_interval = 3600
 
 
 
@@ -24,10 +29,12 @@ db = SQLAlchemy(app)
 compete_initiated = False
 
 
-# openai.api_key = os.getenv("OPENAI_API_KEY")
 OpenAI_client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
 )
+Google_genai_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+Google_chat_list = {}
+
 
 logging.basicConfig(level=logging.INFO)
 
@@ -144,7 +151,7 @@ def submit_user_input():
 	chat_0.add_user_input(input_text)
 	db.session.commit()
 
-	reply_0 = get_reply_from_agent(chat_0.model, chat_0.chat_history, chat_0.developer_instruction)
+	reply_0 = get_reply_from_agent(int(chat_id[0]), chat_0.model, chat_0.chat_history, chat_0.developer_instruction)
 
 	chat_0.add_agent_reply(reply_0)
 	db.session.commit()
@@ -154,10 +161,12 @@ def submit_user_input():
 	# get response from the second model
 	chat_1 = ChatsDB.query.filter_by(chat_id=int(chat_id[1])).first()
 
+	logging.info(f"the second chat {chat_1.chat_id}: {chat_1.model}")
+
 	chat_1.add_user_input(input_text)
 	db.session.commit()
 
-	reply_1 = get_reply_from_agent(chat_1.model, chat_1.chat_history, chat_1.developer_instruction)
+	reply_1 = get_reply_from_agent(int(chat_id[1]), chat_1.model, chat_1.chat_history, chat_1.developer_instruction)
 
 	chat_1.add_agent_reply(reply_1)
 	db.session.commit()
@@ -166,8 +175,10 @@ def submit_user_input():
 
 	return jsonify({"answer_1": reply_0, "answer_2": reply_1})
 
-def get_reply_from_agent(model_name, chat_history, developer_instruction):
+def get_reply_from_agent(chat_id, model_name, chat_history, developer_instruction):
 	
+	logging.info(model_name)
+
 	if model_name == "gpt-4o":
 
 		modified_history = []
@@ -181,7 +192,7 @@ def get_reply_from_agent(model_name, chat_history, developer_instruction):
 
 		modified_history = [{"role": "developer", "content": developer_instruction}] + modified_history
 
-		logging.info(modified_history)
+		# logging.info(modified_history)
 
 		response = OpenAI_client.chat.completions.create(
 			model=model_name,
@@ -190,7 +201,20 @@ def get_reply_from_agent(model_name, chat_history, developer_instruction):
 		reply = response.choices[0].message.content
 		return reply
 	elif model_name == "gemini-2.0-flash":
-		...
+
+		if not (chat_id in Google_chat_list):
+			Google_chat_list[chat_id] = [Google_genai_client.chats.create(model=model_name), time.time()]
+
+		if chat_history[-1]["role"] != "user":
+			logging.info(f"Error: last message is not from user.")
+			return "Error: last message is not from user."
+
+		message_to_send = chat_history[-1]["content"]
+		response = Google_chat_list[chat_id][0].send_message(message=message_to_send)
+		reply = response.text
+		return reply
+
+
 	else:
 		logging.info(f"Error: {model_name} not found.")
 		return f"Error: {model_name} not found."
@@ -228,23 +252,29 @@ def restart():
 	return compete()
 
 
-@app.route('/update_first_model/<int:db_id>/<int:chat_id>')
-def update_first_model(db_id, chat_id):
-	selected_model = LLMDB.query.get(db_id)
-	chat = ChatsDB.query.get(chat_id)
+@app.route('/update_model_selection/<int:db_id>/<int:chat_id>')
+def update_model_selection(db_id, chat_id, method=['GET', 'POST']):
+	logging.info("Requested to change the model")
+
+	selected_model = LLMDB.query.filter_by(db_id=db_id).first()
+	# chat = ChatsDB.query.get(chat_id)
+	chat = ChatsDB.query.filter_by(chat_id=chat_id).first()
+	# logging.info(selected_model.name)
+	# logging.info(len(chat.chat_history))
 	if selected_model and chat:
 		if len(chat.chat_history) == 0:
 			chat.model = selected_model.name
+			db.session.commit()
+			modified_chat = ChatsDB.query.filter_by(chat_id=chat_id).first()
+			logging.info(f"Model {modified_chat.chat_id} changed to {modified_chat.model}")
+		else:
+			logging.info("Chat has started. Fail to change the model.")
 		return str(chat.model)
+	else:
+		logging.info("Either llm or chat not found.")
 	return "Error: Model does not exist.", 404
 
-# @app.route('/update_second_model/<int:db_id>')
-# def update_second_model(db_id):
-# 	second_selected = LLMDB.query.get(db_id)
-# 	if second_selected:
-# 		two_models_selected[1] = second_selected.db_id
-# 		return str(second_selected.db_id)
-# 	return "Error: Model does not exist.", 404
+
 
 
 

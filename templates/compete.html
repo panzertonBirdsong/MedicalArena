@@ -52,7 +52,7 @@
 
 		<script>
 			const chat_id_list_second = {{ chat_id | tojson }};
-			const chat_id_second = chat_id_list_second[0]
+			const chat_id_second = chat_id_list_second[1]
 			document.getElementById("second_model_selected").addEventListener("change", function(){
 				let selected_db_id = this.value;
 				fetch(`/update_model_selection/${selected_db_id}/${chat_id_second}`)
